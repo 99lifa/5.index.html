@@ -1,0 +1,91 @@
+<script>
+  const form = document.getElementById('dropboxForm');
+  const guestMessages = document.getElementById('guestMessages');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  // Load messages from GitHub (messages.json)
+  async function loadMessages() {
+    try {
+      const res = await fetch('messages.json');
+      const messages = await res.json();
+      displayMessages(messages);
+      return messages;
+    } catch (err) {
+      guestMessages.innerHTML = '<p>Could not load messages.</p>';
+      return [];
+    }
+  }
+
+  // Display messages
+  function displayMessages(messages) {
+    guestMessages.innerHTML = '';
+    messages.forEach(msg => {
+      const div = document.createElement('div');
+      div.innerHTML = `<strong>${msg.name}</strong> <em>(${msg.time})</em><br>${msg.message}${msg.fileName ? `<br><small>File: ${msg.fileName}</small>` : ''}`;
+      guestMessages.appendChild(div);
+    });
+  }
+
+  // Local storage helpers
+  function saveMessages(messages) {
+    localStorage.setItem('guestMessages', JSON.stringify(messages));
+  }
+
+  function loadLocalMessages() {
+    const stored = localStorage.getItem('guestMessages');
+    return stored ? JSON.parse(stored) : [];
+  }
+
+  // Form submission
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const name = document.getElementById('name').value;
+    const message = document.getElementById('message').value;
+    const fileInput = document.getElementById('file');
+    const file = fileInput.files[0];
+
+    const newMessage = {
+      name: name,
+      message: message,
+      fileName: file ? file.name : '',
+      time: new Date().toLocaleString()
+    };
+
+    const messages = loadLocalMessages();
+    messages.push(newMessage);
+    saveMessages(messages);
+
+    alert("✅ Message saved locally. Use 'Download Messages' to export.");
+    form.reset();
+  });
+
+  // Download messages.json (merged)
+  downloadBtn.addEventListener('click', async function () {
+    const githubMessages = await loadMessages();
+    const localMessages = loadLocalMessages();
+
+    // Merge and remove duplicates
+    const allMessages = [...githubMessages, ...localMessages];
+    const uniqueMessages = Array.from(
+      new Map(allMessages.map(m => [JSON.stringify(m), m])).values()
+    );
+
+    const blob = new Blob([JSON.stringify(uniqueMessages, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'messages.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+
+    alert("📥 Merged messages downloaded. Upload this file to GitHub.");
+  });
+
+  // Load GitHub messages on page load
+  loadMessages();
+</script>
